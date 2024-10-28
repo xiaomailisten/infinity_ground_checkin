@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@initia/initia.js": "^0.2.13",
+    "dotenv": "^16.4.5",
+    "solc": "^0.8.27"
+  }
+}

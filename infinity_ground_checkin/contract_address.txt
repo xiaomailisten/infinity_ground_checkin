@@ -1,0 +1,3 @@
+== Contract Address Information ==
+Checkin contract deployed at: 0x903b15BA9Cc178B181af6693185b765DE5039Bf1
+LevelRewards contract deployed at: 0xa5aDf1dcc79dEF3fBa5c0f4d65e0ec4b1dd73363

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Level Rewards Interface</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+</head>
+
+<body>
+    <h1>Level Rewards Contract Interface</h1>
+
+    <div id="wallet">
+        <button onclick="connectWallet()">Connect Wallet</button>
+        <p id="walletAddress">Wallet: Not connected</p>
+        <p id="networkInfo">Network: Not detected</p>
+        <div>
+            <h3>Your Token Balances</h3>
+            <button onclick="checkAllTokenBalances()">Check All Balances</button>
+            <p id="userBalance">Token Balances: Not checked</p>
+        </div>
+    </div>
+
+    <hr>
+
+    <h2>Admin Functions</h2>
+    <div>
+        <h3>Set User Level</h3>
+        <input type="text" id="userAddress" placeholder="User Address">
+        <input type="number" id="level" placeholder="Level (1-5)">
+        <button onclick="setUserLevel()">Set Level</button>
+    </div>
+
+    <div>
+        <h3>Deposit USDT</h3>
+        <input type="number" id="depositAmount" placeholder="Amount">
+        <button onclick="depositUSDT()">Deposit</button>
+    </div>
+
+    <hr>
+
+    <h2>User Functions</h2>
+    <div>
+        <h3>Claim Reward</h3>
+        <input type="number" id="claimAmount" placeholder="Amount">
+        <button onclick="claimReward()">Claim</button>
+    </div>
+
+    <div>
+        <h3>Check User Info</h3>
+        <input type="text" id="checkAddress" placeholder="User Address">
+        <button onclick="checkUser()">Check</button>
+        <p id="userInfo">User Info: Not checked</p>
+    </div>
+
+    <div>
+        <h3>Contract Balance</h3>
+        <button onclick="checkBalance()">Check Balance</button>
+        <p id="contractBalance">Balance: Not checked</p>
+    </div>
+
+    <script>
+        // 代币配置
+        const tokens = {
+            USDT: {
+                address: "0x5Edcc27AD022551fA16CE1AC9EdB3baB99e1da2D",
+                decimals: 6,
+                symbol: "USDT"
+            },
+            // 添加更多代币，确保地址正确
+            /*BUSD: {
+                address: "BUSD合约地址",
+                decimals: 18,
+                symbol: "BUSD"
+            }*/
+        };
+
+        // Contract addresses
+        const contractAddress = "0xa5aDf1dcc79dEF3fBa5c0f4d65e0ec4b1dd73363";
+        const usdtAddress = tokens.USDT.address;
+
+        // Contract ABI
+        const contractABI = [
+            "function setUserLevel(address user, uint8 level)",
+            "function getUserLevel(address user) view returns (tuple(uint8 level, uint256 dailyRewards, uint256 lastClaim))",
+            "function claimReward(uint256 amount)",
+            "function getContractBalance() view returns (uint256)",
+            "function depositUSDT(uint256 amount)",
+        ];
+
+        const tokenABI = [
+            "function approve(address spender, uint256 amount) returns (bool)",
+            "function allowance(address owner, address spender) view returns (uint256)",
+            "function balanceOf(address account) view returns (uint256)",
+            "function decimals() view returns (uint8)",
+            "function symbol() view returns (string)"
+        ];
+
+        let provider;
+        let signer;
+        let contract;
+        let usdt;
+
+        async function checkAllTokenBalances() {
+            try {
+                if (!signer) {
+                    alert('Please connect wallet first');
+                    return;
+                }
+
+                const userAddress = await signer.getAddress();
+                let balanceText = "Token Balances:\n";
+
+                for (const [name, token] of Object.entries(tokens)) {
+                    const tokenContract = new ethers.Contract(
+                        token.address,
+                        tokenABI,
+                        provider
+                    );
+
+                    const balance = await tokenContract.balanceOf(userAddress);
+                    const symbol = await tokenContract.symbol();
+
+                    balanceText += `${symbol}: ${ethers.utils.formatUnits(balance, token.decimals)}\n`;
+                }
+
+                document.getElementById('userBalance').innerText = balanceText;
+            } catch (error) {
+                console.error('Error checking balances:', error);
+                alert('Error checking balances: ' + error.message);
+            }
+        }
+
+        function checkMetaMask() {
+            if (typeof window.ethereum !== 'undefined') {
+                console.log('MetaMask is installed!');
+                document.getElementById('networkInfo').textContent = 'MetaMask detected!';
+                window.ethereum.on('accountsChanged', function (accounts) {
+                    console.log('Account changed:', accounts[0]);
+                    if (accounts.length > 0) {
+                        document.getElementById('walletAddress').textContent = `Wallet: ${accounts[0]}`;
+                        checkAllTokenBalances();
+                    } else {
+                        document.getElementById('walletAddress').textContent = 'Wallet: Not connected';
+                    }
+                });
+
+                window.ethereum.on('chainChanged', function (chainId) {
+                    console.log('Network changed:', chainId);
+                    window.location.reload();
+                });
+            } else {
+                console.log('MetaMask is not installed!');
+                document.getElementById('networkInfo').textContent = 'Please install MetaMask!';
+            }
+        }
+
+        window.addEventListener('load', function () {
+            checkMetaMask();
+        });
+
+        async function connectWallet() {
+            try {
+                if (typeof window.ethereum === 'undefined') {
+                    alert('Please install MetaMask!');
+                    return;
+                }
+
+                try {
+                    await window.ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: '0x61' }],
+                    });
+                } catch (switchError) {
+                    if (switchError.code === 4902) {
+                        try {
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [{
+                                    chainId: '0x61',
+                                    chainName: 'BSC Testnet',
+                                    nativeCurrency: {
+                                        name: 'BNB',
+                                        symbol: 'BNB',
+                                        decimals: 18
+                                    },
+                                    rpcUrls: ['https://bsc-testnet-rpc.publicnode.com'],
+                                    blockExplorerUrls: ['https://testnet.bscscan.com']
+                                }]
+                            });
+                        } catch (addError) {
+                            console.error('Error adding BSC Testnet:', addError);
+                        }
+                    }
+                }
+
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                signer = provider.getSigner();
+
+                contract = new ethers.Contract(contractAddress, contractABI, signer);
+                usdt = new ethers.Contract(usdtAddress, tokenABI, signer);
+
+                const address = await signer.getAddress();
+                document.getElementById('walletAddress').textContent = `Wallet: ${address}`;
+
+                const network = await provider.getNetwork();
+                document.getElementById('networkInfo').textContent = `Network: ${network.name}`;
+
+                await checkAllTokenBalances();
+            } catch (error) {
+                console.error('Error connecting wallet:', error);
+                alert('Error connecting wallet: ' + error.message);
+            }
+        }
+
+        async function setUserLevel() {
+            try {
+                if (!contract) {
+                    alert('Please connect wallet first');
+                    return;
+                }
+                const userAddress = document.getElementById('userAddress').value;
+                const level = document.getElementById('level').value;
+
+                const tx = await contract.setUserLevel(userAddress, level);
+                await tx.wait();
+
+                alert('Level set successfully!');
+            } catch (error) {
+                console.error('Error setting level:', error);
+                alert('Error setting level: ' + error.message);
+            }
+        }
+
+        async function depositUSDT() {
+            try {
+                if (!contract || !usdt) {
+                    alert('Please connect wallet first');
+                    return;
+                }
+                const amount = ethers.utils.parseUnits(document.getElementById('depositAmount').value, 6);
+
+                // First approve USDT
+                const approveTx = await usdt.approve(contractAddress, amount);
+                await approveTx.wait();
+
+                // Then deposit
+                const tx = await contract.depositUSDT(amount);
+                await tx.wait();
+
+                alert('USDT deposited successfully!');
+                await checkAllTokenBalances();
+            } catch (error) {
+                console.error('Error depositing USDT:', error);
+                alert('Error depositing USDT: ' + error.message);
+            }
+        }
+
+        async function claimReward() {
+            try {
+                if (!contract) {
+                    alert('Please connect wallet first');
+                    return;
+                }
+                const amount = ethers.utils.parseUnits(document.getElementById('claimAmount').value, 6);
+
+                const tx = await contract.claimReward(amount);
+                await tx.wait();
+
+                alert('Reward claimed successfully!');
+                await checkAllTokenBalances();
+            } catch (error) {
+                console.error('Error claiming reward:', error);
+                alert('Error claiming reward: ' + error.message);
+            }
+        }
+
+        async function checkUser() {
+            try {
+                if (!contract) {
+                    alert('Please connect wallet first');
+                    return;
+                }
+                const address = document.getElementById('checkAddress').value;
+                const userInfo = await contract.getUserLevel(address);
+
+                document.getElementById('userInfo').textContent = `
+                    Level: ${userInfo.level}
+                    Daily Rewards: ${ethers.utils.formatUnits(userInfo.dailyRewards, 6)}
+                    Last Claim: ${new Date(userInfo.lastClaim.toNumber() * 1000).toLocaleString()}
+                `;
+            } catch (error) {
+                console.error('Error checking user:', error);
+                alert('Error checking user: ' + error.message);
+            }
+        }
+
+        async function checkBalance() {
+            try {
+                if (!contract) {
+                    alert('Please connect wallet first');
+                    return;
+                }
+                const balance = await contract.getContractBalance();
+                console.log(balance);
+                document.getElementById('contractBalance').textContent =
+                    `Balance: ${ethers.utils.formatUnits(balance, 6)} USDT`;
+            } catch (error) {
+                console.error('Error checking balance:', error);
+                alert('Error checking balance: ' + error.message);
+            }
+        }
+    </script>
+</body>
+
+</html>
