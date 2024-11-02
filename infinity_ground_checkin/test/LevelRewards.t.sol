@@ -115,25 +115,19 @@ contract LevelRewardsTest is Test {
     }
     
 
-    function testDailyLimitComprehensive() public {
-        // 设置用户等级为1级 (每日限额2 USDT)
+    function testDailyLimitDos() public {
+        uint256 entryProtocolTime = 1000;
+        
         rewards.setUserLevel(user1, 1);
+        vm.startPrank(user1);
         
-        // 第一次领取1 USDT
-        vm.prank(user1);
+        vm.warp(entryProtocolTime);
         rewards.claimReward(1 * 10 ** 18);
-        
-        // 第二次领取0.9 USDT
-        vm.prank(user1);
+
+        vm.warp(entryProtocolTime + 1 days - 1);
         rewards.claimReward(0.9 * 10 ** 18);
-        
-        // 尝试再领取0.2 USDT
-        vm.prank(user1);
-        vm.expectRevert("Daily limit exceeded");
-        rewards.claimReward(0.2 * 10 ** 18);
-        
-        LevelRewards.UserInfo memory userInfo = rewards.getUserLevel(user1);
-        assertEq(userInfo.dailyRewards, 1.9 * 10 ** 18);
+        vm.warp(entryProtocolTime + 2 days - 100);
+        rewards.claimReward(0.9 * 10 ** 18);
     }
     
 

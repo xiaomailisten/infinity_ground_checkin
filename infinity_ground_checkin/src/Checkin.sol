@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 struct checkinInfo {
   int64 checkinNum;
   uint256 lastCheckinTimestamp;
 }
 
-contract Checkin is Ownable {
+contract Checkin is Ownable2Step {
   uint256 public startTimestamp;
   uint256 public checkinFee; // checkin fee
   address public admin;
@@ -24,6 +23,9 @@ contract Checkin is Ownable {
   error SendFailed();
 
   event CheckinEvent(address indexed user, int64 checkinNum, uint256 timestamp);
+  event AdminUpdated(address indexed oldAdmin, address indexed newAdmin);
+  event CheckinFeeUpdated(uint256 newFee);
+  event WithdrawExecuted(uint256 amount);
 
   constructor(uint256 startTimestamp_, uint256 checkinFee_, uint256 gasFee_) Ownable(msg.sender) {
       startTimestamp = startTimestamp_;
@@ -64,17 +66,22 @@ contract Checkin is Ownable {
 
   function updateCheckinFee(uint256 newCheckinFee) external onlyOwner {
     checkinFee = newCheckinFee;
+    emit CheckinFeeUpdated(newCheckinFee);
   }
   
   function withdraw() external payable onlyOwner {
-    (bool success, ) = payable(owner()).call{value: address(this).balance}("");
+    uint256 amount = address(this).balance;
+    (bool success, ) = payable(owner()).call{value: amount}("");
     if (!success) {
       revert SendFailed();
     }
+    emit WithdrawExecuted(amount);
   }
 
   function updateAdmin(address newAdmin) external onlyOwner {
+    address oldAdmin = admin;
     admin = newAdmin;
+    emit AdminUpdated(oldAdmin, newAdmin);
   }
   
   function updateGasFee(uint256 newGasFee) external onlyOwner {
@@ -89,7 +96,10 @@ contract Checkin is Ownable {
     if (msg.sender != admin && msg.sender != owner()) {
       revert InvalidAdmin();
     }
-    payable(to).transfer(gasFee);
+    (bool success, ) = payable(to).call{value: gasFee}("");
+    if (!success) {
+      revert SendFailed();
+    }
   }
 
   function deposit() external payable onlyOwner {}  
